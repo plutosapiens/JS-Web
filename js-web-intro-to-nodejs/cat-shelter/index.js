@@ -1,4 +1,6 @@
 const http = require("http");
+const fs = require("fs");
+const qs = require("querystring");
 const homeHtml = require("./views/home/index");
 const siteCss = require("./content/styles/site");
 const addBreedHtml = require("./views/addBreed");
@@ -36,7 +38,7 @@ const cats = [
 const server = http.createServer((req, res) =>{
     const { url } = req;
 
-    if(url === "/"){
+    if(url === "/" && req.method === 'GET'){
         const imgUrlPattern = /{{imgUrl}}/g;
         const namePattern = /{{name}}/g;
         const breedPattern = /{{breed}}/g;
@@ -48,33 +50,72 @@ const server = http.createServer((req, res) =>{
             .replace(descriptionPattern, cat.description)
             ).join('');
         const homeHtmlTemplate = homeHtml.replace("{{cats}}", catHtml)
-        console.log(homeHtml);
 
         res.writeHead(200,{
             "Content-Type": "text/html",
         });
         res.write(homeHtmlTemplate)
     }
-    else if(url ==="/content/styles/site.css"){
+    else if(url ==="/content/styles/site.css" && req.method === 'GET'){
         res.writeHead(200, {
             "Cintent-Type": "text/css"
         });
         res.write(siteCss)
     }
-    else if(url ==="/cats/add-breed"){
+    else if(url ==="/cats/add-breed" && req.method === 'GET'){
         res.writeHead(200, {
             "Content-Type": "text/html"
         })
         res.write(addBreedHtml)
     }
-    else if(url === "/cats/add-cat"){
+    else if(url ==="/cats/add-breed" && req.method === 'POST'){
+        console.log('Inside POST handler for /cats/add-breed');
+        let formData = '';
+
+        req.on('data', (data) => {
+            formData += data;
+        });
+        
+        req.on('end', () => {
+
+            let body = qs.parse(formData);
+
+            console.log('Parsed body:', body);
+
+            fs.readFile('./data/breeds.json', 'utf-8', (err,data) => {
+                if (err) {
+                    console.error('Error reading breeds.json:', err);
+                    res.writeHead(500, { 'Content-Type': 'text/plain' });
+                    res.end('Internal Server Error');
+                    return;
+                }
+
+                let breeds = JSON.parse(data);
+                breeds.push(body.breed);
+                let json = JSON.stringify(breeds.sort());
+
+                fs.writeFile('./data/breeds.json', json, 'utf-8', (writeErr) => {
+                    if (writeErr) {
+                        console.error('Error writing breeds.json:', writeErr);
+                        res.writeHead(500, { 'Content-Type': 'text/plain' });
+                        res.end('Internal Server Error');
+                    } else {
+                        console.log('The breed was uploaded successfully! :)');
+                        res.writeHead(301, {
+                            'Location': '/'
+                        });
+            res.end();
+                    }
+                });
+            });
+        });
+    }
+    else if(url === "/cats/add-cat" && req.method === 'GET'){
         res.writeHead(200, {
             "Content-Type": "text/html"
         })
         res.write(addCatHtml)
     }
-
-    res.write('Hello, biatch!Wazzaaap');
     res.end();
 });
 server.listen(port, () => console.log(`Server is running on port ${port}`));
